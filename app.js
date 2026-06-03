@@ -6,11 +6,28 @@ function set(chave, valor){
     localStorage.setItem(chave, JSON.stringify(valor));
 }
 
+function cadastrar(){
+    const usuario = document.getElementById("usuario").value;
+    const senha = document.getElementById("senha").value;
+
+    if(!usuario || !senha){
+        alert("Preencha usuário e senha");
+        return;
+    }
+
+    localStorage.setItem("conta_" + usuario, senha);
+    alert("Conta criada com sucesso!");
+}
+
 function login(){
     const usuario = document.getElementById("usuario").value;
     const senha = document.getElementById("senha").value;
 
-    if(usuario === "jg" && senha === "12345678"){
+    const senhaSalva = localStorage.getItem("conta_" + usuario);
+
+    if(senhaSalva === senha){
+        localStorage.setItem("usuarioLogado", usuario);
+
         document.getElementById("login").style.display = "none";
         document.getElementById("sistema").style.display = "block";
         abrirTela("dashboard");
