@@ -1,3 +1,35 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB5UBkxm8WkVwHwH0ew8wUdvP-gZC0KoKo",
+  authDomain: "erp-v14.firebaseapp.com",
+  projectId: "erp-v14",
+  storageBucket: "erp-v14.firebasestorage.app",
+  messagingSenderId: "258665981288",
+  appId: "1:258665981288:web:dc159ebbff740d9a26a2dd",
+  measurementId: "G-NF08TF0C58"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
 function get(chave){
     return JSON.parse(localStorage.getItem(chave) || "[]");
 }
@@ -6,35 +38,51 @@ function set(chave, valor){
     localStorage.setItem(chave, JSON.stringify(valor));
 }
 
-function cadastrar(){
+async function cadastrar(){
     const usuario = document.getElementById("usuario").value;
     const senha = document.getElementById("senha").value;
 
     if(!usuario || !senha){
-        alert("Preencha usuário e senha");
+        alert("Preencha email e senha");
         return;
     }
 
-    localStorage.setItem("conta_" + usuario, senha);
-    alert("Conta criada com sucesso!");
+    try{
+        await createUserWithEmailAndPassword(
+            auth,
+            usuario,
+            senha
+        );
+
+        alert("Conta criada com sucesso!");
+    }catch(erro){
+        alert(erro.message);
+    }
 }
 
-function login(){
+async function login(){
     const usuario = document.getElementById("usuario").value;
     const senha = document.getElementById("senha").value;
 
-    const senhaSalva = localStorage.getItem("conta_" + usuario);
-
-    if(senhaSalva === senha){
-        localStorage.setItem("usuarioLogado", usuario);
+    try{
+        await signInWithEmailAndPassword(
+            auth,
+            usuario,
+            senha
+        );
 
         document.getElementById("login").style.display = "none";
         document.getElementById("sistema").style.display = "block";
+
         abrirTela("dashboard");
-    }else{
+
+    }catch(erro){
         alert("Usuário ou senha incorretos");
     }
 }
+
+window.cadastrar = cadastrar;
+window.login = login;
 
 function abrirTela(nome){
     document.querySelectorAll(".tela").forEach(t => {
@@ -44,7 +92,7 @@ function abrirTela(nome){
     document.getElementById(nome).style.display = "block";
 }
 
-function salvarCliente(){
+async function salvarCliente(){
     const empresa = document.getElementById("empresa").value;
     const nome = document.getElementById("nome").value;
     const email = document.getElementById("email").value;
@@ -56,10 +104,7 @@ function salvarCliente(){
         return;
     }
 
-    const clientes = get("clientes");
-
-    clientes.push({
-        id: Date.now(),
+    await addDoc(collection(db, "clientes"), {
         empresa,
         nome,
         email,
@@ -68,7 +113,7 @@ function salvarCliente(){
         dataCadastro: new Date().toISOString()
     });
 
-    set("clientes", clientes);
+    alert("Cliente salvo na nuvem!");
 
     document.getElementById("empresa").value = "";
     document.getElementById("nome").value = "";
@@ -79,41 +124,94 @@ function salvarCliente(){
     carregarClientes();
 }
 
-function carregarClientes(){
-    const clientes = get("clientes");
+async function carregarClientes(){
     const lista = document.getElementById("listaClientes");
-
     lista.innerHTML = "";
 
-    clientes.forEach(c => {
+    const querySnapshot = await getDocs(collection(db, "clientes"));
+    let total = 0;
+
+    querySnapshot.forEach((doc) => {
+        const c = doc.data();
+        total++;
+
         lista.innerHTML += `
-            <p>
-                <strong>${c.nome}</strong> - ${c.email}<br>
-                Empresa: ${c.empresa || "-"} |
-                CPF/CNPJ: ${c.cpf || "-"} |
-                Telefone: ${c.telefone || "-"}
-            </p>
-        `;
+    <p>
+        <strong>${c.nome}</strong> - ${c.email}<br>
+        Empresa: ${c.empresa || "-"} |
+        CPF/CNPJ: ${c.cpf || "-"} |
+        Telefone: ${c.telefone || "-"}<br><br>
+
+        <button onclick="editarCliente('${doc.id}')">Editar</button>
+        <button onclick="excluirCliente('${doc.id}')">Excluir</button>
+    </p>
+`;
     });
 
-    document.getElementById("kCli").textContent = clientes.length;
+    document.getElementById("kCli").textContent = total;
+}
+async function excluirCliente(id){
+    if(confirm("Deseja excluir este cliente?")){
+        await deleteDoc(doc(db, "clientes", id));
+        alert("Cliente excluído!");
+        carregarClientes();
+    }
 }
 
-function filtrarClientes(){
+async function editarCliente(id){
+    const novoNome = prompt("Novo nome:");
+    const novoEmail = prompt("Novo email:");
+
+    if(!novoNome || !novoEmail){
+        alert("Nome e email são obrigatórios");
+        return;
+    }
+
+    await updateDoc(doc(db, "clientes", id), {
+        nome: novoNome,
+        email: novoEmail
+    });
+
+    alert("Cliente atualizado!");
+    carregarClientes();
+}
+async function filtrarClientes(){
     const termo = document.getElementById("buscarCliente").value.toLowerCase();
-    const clientes = get("clientes");
     const lista = document.getElementById("listaClientes");
 
     lista.innerHTML = "";
 
-    clientes
-        .filter(c => c.nome.toLowerCase().includes(termo))
-        .forEach(c => {
-            lista.innerHTML += `<p>${c.nome} - ${c.email}</p>`;
-        });
+    const querySnapshot = await getDocs(collection(db, "clientes"));
+
+    let total = 0;
+
+    querySnapshot.forEach((docItem) => {
+        const c = docItem.data();
+
+        if(c.nome.toLowerCase().includes(termo)){
+            total++;
+
+            lista.innerHTML += `
+                <p>
+                    <strong>${c.nome}</strong> - ${c.email}<br>
+                    Empresa: ${c.empresa || "-"} |
+                    CPF/CNPJ: ${c.cpf || "-"} |
+                    Telefone: ${c.telefone || "-"}<br><br>
+
+                    <button onclick="editarCliente('${docItem.id}')">Editar</button>
+                    <button onclick="excluirCliente('${docItem.id}')">Excluir</button>
+                </p>
+            `;
+        }
+    });
+
+    document.getElementById("kCli").textContent = total;
 }
 
-function salvarFatura(){
+
+let faturasCache = [];
+
+async function salvarFatura(){
     const cliente = document.getElementById("clienteFatura").value;
     const valor = Number(document.getElementById("valorFatura").value);
     const vencimento = document.getElementById("vencimento").value;
@@ -124,10 +222,7 @@ function salvarFatura(){
         return;
     }
 
-    const faturas = get("faturas");
-
-    faturas.push({
-        id: Date.now(),
+    await addDoc(collection(db, "faturas"), {
         cliente,
         valor,
         vencimento,
@@ -136,50 +231,41 @@ function salvarFatura(){
         data: new Date().toISOString()
     });
 
-    set("faturas", faturas);
+    alert("Fatura salva na nuvem!");
 
     document.getElementById("clienteFatura").value = "";
     document.getElementById("valorFatura").value = "";
     document.getElementById("vencimento").value = "";
 
     carregarFaturas();
-    criarGrafico();
 }
 
-function pagarFatura(id){
-    const faturas = get("faturas");
-    const historico = get("historico");
-
-    faturas.forEach(f => {
-        if(f.id === id && f.status !== "Pago"){
-            f.status = "Pago";
-
-            historico.push({
-                cliente: f.cliente,
-                valor: f.valor,
-                dataPagamento: new Date().toISOString()
-            });
-        }
+async function pagarFatura(id){
+    await updateDoc(doc(db, "faturas", id), {
+        status: "Pago",
+        dataPagamento: new Date().toISOString()
     });
 
-    set("faturas", faturas);
-    set("historico", historico);
-
     carregarFaturas();
-    criarGrafico();
+    
 }
 
-function carregarFaturas(){
-    const faturas = get("faturas");
+async function carregarFaturas(){
     const lista = document.getElementById("listaFaturas");
-
     lista.innerHTML = "";
+
+    const querySnapshot = await getDocs(collection(db, "faturas"));
 
     let receita = 0;
     let recebido = 0;
     let pendente = 0;
+    faturasCache = [];
 
-    faturas.forEach(f => {
+    querySnapshot.forEach((docItem) => {
+        const f = docItem.data();
+        f.id = docItem.id;
+        faturasCache.push(f);
+
         receita += f.valor;
 
         if(f.status === "Pago"){
@@ -194,55 +280,50 @@ function carregarFaturas(){
                 - R$ ${f.valor.toFixed(2)}
                 - ${f.formaPagamento || "-"}
                 - Vencimento: ${f.vencimento || "-"}
-                - 
+                -
                 <span class="${f.status === "Pago" ? "status-pago" : "status-pendente"}">
                     ${f.status === "Pago" ? "✔ Pago" : "Pendente"}
                 </span>
 
-                ${
-                    f.status !== "Pago"
-                    ? `
-                    <button onclick="pagarFatura(${f.id})">
-                        Pagar
-                    </button>
-                    `
-                    : ""
-                }
+                ${f.status !== "Pago"
+? `<button onclick="pagarFatura('${f.id}')">Pagar</button>`
+: `<button onclick="pendenteFatura('${f.id}')">Pendente</button>`
+}
+
+<button onclick="editarFatura('${f.id}')">Editar</button>
+<button onclick="excluirFatura('${f.id}')">Excluir</button>
+
+                
             </p>
         `;
     });
 
-    document.getElementById("kFat").textContent = faturas.length;
+    document.getElementById("kFat").textContent = faturasCache.length;
     document.getElementById("kRec").textContent = "R$ " + receita.toFixed(2);
 
-    const media = faturas.length ? receita / faturas.length : 0;
+    const media = faturasCache.length ? receita / faturasCache.length : 0;
     document.getElementById("kMedia").textContent = "R$ " + media.toFixed(2);
 
     document.getElementById("recebido").textContent = "R$ " + recebido.toFixed(2);
     document.getElementById("pendente").textContent = "R$ " + pendente.toFixed(2);
-    document.getElementById("totalFaturas").textContent = faturas.length;
+    document.getElementById("totalFaturas").textContent = faturasCache.length;
+
+    criarGrafico();
 }
-    
 
 function criarGrafico(){
-
-    const faturas = get("faturas");
-
     let pagas = 0;
     let pendentes = 0;
 
-    faturas.forEach(f => {
-
+    faturasCache.forEach(f => {
         if(f.status === "Pago"){
             pagas++;
         }else{
             pendentes++;
         }
-
     });
 
-    const ctx =
-    document.getElementById("grafico");
+    const ctx = document.getElementById("grafico");
 
     if(window.graficoERP){
         window.graficoERP.destroy();
@@ -250,32 +331,110 @@ function criarGrafico(){
 
     window.graficoERP = new Chart(ctx,{
         type:"doughnut",
-
         data:{
             labels:["Pagas","Pendentes"],
-
             datasets:[{
-                data:[pagas,pendentes],
-
-                backgroundColor:[
-                    "#22c55e",
-                    "#ef4444"
-                ],
-
+                data:[pagas, pendentes],
+                backgroundColor:["#22c55e", "#ef4444"],
                 borderWidth:0
             }]
         },
-
         options:{
             responsive:true,
             maintainAspectRatio:false
         }
     });
 }
+async function pendenteFatura(id){
+    await updateDoc(doc(db, "faturas", id), {
+        status: "Pendente"
+    });
 
-function gerarPDF(){
-    alert("PDF em desenvolvimento");
+    carregarFaturas();
 }
+
+async function excluirFatura(id){
+    if(confirm("Deseja excluir esta fatura?")){
+        await deleteDoc(doc(db, "faturas", id));
+        carregarFaturas();
+    }
+}
+
+async function editarFatura(id){
+    const novoCliente = prompt("Novo cliente:");
+    const novoValor = Number(prompt("Novo valor:"));
+
+    if(!novoCliente || novoValor <= 0){
+        alert("Cliente e valor são obrigatórios");
+        return;
+    }
+
+    await updateDoc(doc(db, "faturas", id), {
+        cliente: novoCliente,
+        valor: novoValor
+    });
+
+    carregarFaturas();
+}
+function gerarPDF(){
+
+    const { jsPDF } = window.jspdf;
+
+    const pdf = new jsPDF();
+
+    pdf.setFontSize(18);
+    pdf.text("Relatório de Faturas", 20, 20);
+
+    let y = 40;
+
+    faturasCache.forEach((f, i) => {
+
+        pdf.setFontSize(11);
+
+        pdf.text(
+            `${i + 1}. ${f.cliente} | R$ ${f.valor.toFixed(2)} | ${f.status}`,
+            20,
+            y
+        );
+
+        y += 10;
+
+        if(y > 270){
+            pdf.addPage();
+            y = 20;
+        }
+    });
+
+    pdf.save("faturas.pdf");
+}
+function gerarRelatorioMensal(){
+
+    const mesAtual = new Date().getMonth();
+    const anoAtual = new Date().getFullYear();
+
+    let total = 0;
+    let quantidade = 0;
+
+    faturasCache.forEach(f => {
+
+        const data = new Date(f.data);
+
+        if(
+            data.getMonth() === mesAtual &&
+            data.getFullYear() === anoAtual
+        ){
+            total += f.valor;
+            quantidade++;
+        }
+    });
+
+    alert(
+        `Relatório Mensal\n\n` +
+        `Faturas: ${quantidade}\n` +
+        `Total: R$ ${total.toFixed(2)}`
+    );
+}
+
 
 function atualizarHorario(){
     const campo = document.getElementById("ultimaAtualizacao");
@@ -287,11 +446,45 @@ function atualizarHorario(){
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    carregarClientes();
-    carregarFaturas();
-    atualizarHorario();
-    criarGrafico();
+/* COLE AQUI 👇 */
 
+window.abrirTela = abrirTela;
+window.salvarCliente = salvarCliente;
+window.filtrarClientes = filtrarClientes;
+window.salvarFatura = salvarFatura;
+window.pagarFatura = pagarFatura;
+window.pendenteFatura = pendenteFatura;
+window.gerarPDF = gerarPDF;
+window.editarCliente = editarCliente;
+window.excluirCliente = excluirCliente;
+window.editarFatura = editarFatura;
+window.excluirFatura = excluirFatura;
+window.gerarRelatorioMensal = gerarRelatorioMensal;
+
+
+/* ATÉ AQUI 👆 */
+function iniciarDashboardTempoReal(){
+    onSnapshot(collection(db, "faturas"), () => {
+        carregarFaturas();
+        atualizarHorario();
+    });
+
+    onSnapshot(collection(db, "clientes"), () => {
+        carregarClientes();
+        atualizarHorario();
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    atualizarHorario();
+    iniciarDashboardTempoReal();
     setInterval(atualizarHorario, 1000);
 });
+
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+        .register("./service-worker.js")
+        .then(() => {
+            console.log("PWA instalada");
+        });
+}

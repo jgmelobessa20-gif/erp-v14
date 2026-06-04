@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP Contábil V14</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+
 </head>
 <body>
 
@@ -93,32 +96,30 @@
             </select>
 
             <button onclick="salvarFatura()">Gerar Fatura</button>
+        <button onclick="gerarPDF()">Gerar PDF das Faturas</button>
             <div id="listaFaturas"></div>
         </div>
     </div>
 
     <div id="financeiro" class="tela" style="display:none;">
-        <div class="panel">
-            <h2>Resumo Financeiro</h2>
-            <p>Total Recebido: <span id="recebido">R$ 0,00</span></p>
-            <p>Total Pendente: <span id="pendente">R$ 0,00</span></p>
-            <p>Total de Faturas: <span id="totalFaturas">0</span></p>
-        </div>
-    </div>
+    <div class="panel">
+        <h2>Resumo Financeiro</h2>
 
-    <div id="config" class="tela" style="display:none;">
-        <div class="panel">
-            <h2>Configurações</h2>
-            <button onclick="localStorage.clear(); location.reload();">
-                Limpar Dados
-            </button>
-        </div>
-    </div>
+        <p>Total Recebido: <span id="recebido">R$ 0,00</span></p>
+        <p>Total Pendente: <span id="pendente">R$ 0,00</span></p>
+        <p>Total de Faturas: <span id="totalFaturas">0</span></p>
 
+        <button onclick="gerarRelatorioMensal()">
+            Relatório Mensal
+        </button>
+
+    </div>
+</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 
 </body>
 </html>
