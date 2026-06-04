@@ -481,10 +481,5 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(atualizarHorario, 1000);
 });
 
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker
-        .register("./service-worker.js")
-        .then(() => {
-            console.log("PWA instalada");
-        });
-}
+
+
